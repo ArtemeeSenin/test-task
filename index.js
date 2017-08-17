@@ -1,5 +1,3 @@
-/*Validation*/
-
 var MyForm = {
     validate: function() {
         console.log('validate');
@@ -35,15 +33,29 @@ var MyForm = {
 
         return result;
     },
-    getData: function(){},
-    setData: function(data){},
+    getData: function(){
+        var fieldsData = {};
+        var fields = Array.from(form.querySelectorAll('input'));
+        for(var i = 0; i < fields.length; i++){
+            fieldsData[fields[i].name] = fields[i].value;
+        }
+        return fieldsData;
+    },
+    setData: function(data){
+        var acceptedFieldNames = ['phone', 'fio', 'email'];
+
+        for(var k in data){
+            if(acceptedFieldNames.indexOf(k) !== -1){
+                form[k].value = data[k];
+            }
+        }
+    },
     submit: function(){
         console.log('submit');
         var response = this.validate();
         console.log(response);
         if(response.isValid){
             console.log('ready to send');
-            var submitBtn = form.querySelector('#submitButton');
             submitBtn.setAttribute('disabled', 'disabled');
 
             getResponse(form.action, responseAction);
@@ -57,7 +69,15 @@ function getResponse(url, cb){
     oReq.open("GET", url, true);
     oReq.addEventListener('load', function(){
         var response = JSON.parse(this.responseText);
-        cb(response)
+        if (response.status === 'progress'){
+            console.log('progress ', response);
+            setTimeout(getResponse, response.timeout, url, cb);
+            return;
+        } else {
+            console.log('ready ', response);
+            cb(response);
+            return;
+        }
     })
     oReq.send();
 }
@@ -65,16 +85,22 @@ function getResponse(url, cb){
 function responseAction(response){
     console.log('response: ', response);
     if(response.status === 'success'){
+        resultContainer.classList.remove('error');
         resultContainer.classList.add('success');
         resultContainer.textContent = 'Success';
-        return;
+    } else if(response.status === 'error'){
+        resultContainer.classList.add('error');
+        resultContainer.textContent = response.reason;
     }
+    submitBtn.removeAttribute('disabled');
 }
 
 var form = document.forms.myForm;
+var submitBtn = form.querySelector('#submitButton');
 var resultContainer = document.querySelector('#resultContainer');
 form.addEventListener('submit', function(e){
     e.preventDefault();
+    resultContainer.textContent = '';
     MyForm.submit();
 });
 
