@@ -1,5 +1,6 @@
 var MyForm = (function(){
 
+    /* init */
     var form = document.forms.myForm;
     var fields = Array.from(form.querySelectorAll('input')); // Массив полей формы
     var submitBtn = form.querySelector('#submitButton');
@@ -10,124 +11,144 @@ var MyForm = (function(){
         MyForm.submit();
     });
 
+    /* public */
+    function validate() {
+        console.log('validate');
+        var result = {
+            isValid: true,
+            errorFields: []
+        };
 
-    function getResponse(url, cb){
+        _checkFields(result);
+        _setClasses(result);
+
+        return result;
+    }
+
+    function getData() {
+        var fieldsData = {};
+        for (var i = 0; i < fields.length; i++) {
+            var currentField = fields[i];
+            fieldsData[currentField.name] = currentField.value;
+        }
+        return fieldsData;
+    }
+
+    function setData(data) {
+        var acceptedFieldNames = ['phone', 'fio', 'email']; // Массив допустимых полей
+
+        for (var k in data) { // Занесение данных по ключам полученного объекта
+            if (acceptedFieldNames.indexOf(k) !== -1) {
+                form[k].value = data[k];
+            }
+        }
+    }
+
+    function submit() {
+        console.log('submit');
+        var validationResult = this.validate();
+        console.log(validationResult);
+        if (validationResult.isValid) {
+            console.log('ready to send');
+            submitBtn.setAttribute('disabled', 'disabled');
+
+            _sendRequest(form.action, _responseResult); // Ajax запрос
+        }
+    }
+
+
+    /* private func */
+
+    function _checkFields(result){
+        console.log(result);
+
+        var reForm = { // Регулярки для проверки полей
+            fio: /^(([A-Za-zА-Яа-я]+)\ ){2}([A-Za-zА-Яа-я]+){1}$/,
+            email: /^([a-z0-9_.-]+)@((ya\.ru)|((yandex)\.(ru|ua|by|kz|com)))$/,
+            phone: /^\+7\([\d]{3}\)[\d]{3}\-[\d]{2}\-[\d]{2}$/
+        };
+
+        for (var i = 0; i < fields.length; i++) { // Проверка полей в массиве fields
+            var currentField = fields[i];
+            console.log(currentField);
+
+            if (!reForm[currentField.name].test(currentField.value))
+                result.errorFields.push(currentField.name);
+        }
+        if(result.errorFields.indexOf('phone') === -1 && !_checkPhoneDigitsSum(form.phone.value)){
+            result.errorFields.push('phone');
+        }
+    }
+
+    function _setClasses(result){
+        for(var i = 0; i < fields.length; i++){
+            var currentField = fields[i];
+            if(result.errorFields.indexOf(currentField.name) === -1)
+                currentField.classList.remove('error');
+            else
+                currentField.classList.add('error');
+
+            if(result.errorFields.length)
+                result.isValid = false;
+
+        }
+    }
+
+    function _sendRequest(url, cb){
         console.log('url cb', url, cb);
+
         var oReq = new XMLHttpRequest();
         oReq.open("GET", url, true);
         oReq.addEventListener('load', function(){
             var response = JSON.parse(this.responseText);
-            if (response.status === 'progress'){ // Если ответ progress, повтор запроса через timeout миллисекунд
-                console.log('progress ', response);
-                setTimeout(getResponse, response.timeout, url, cb);
-                return;
-            } else {
-                console.log('ready ', response);
-                cb(response); // Если ответ пришел, выполнение коллбэка
-                return;
-            }
+            var query = {
+                url: url,
+                response: response
+            };
+            _responseResult(query);
         });
         oReq.send();
     }
 
-    function responseAction(response){
-        console.log('response: ', response);
-        switch (response.status) {
+    function _responseResult(query){
+        console.log('query: ', query);
+        switch(query.response.status){
             case 'success':
                 resultContainer.classList.remove('error');
                 resultContainer.classList.add('success');
                 resultContainer.textContent = 'Success';
+                submitBtn.removeAttribute('disabled');
                 break;
             case 'error':
                 resultContainer.classList.add('error');
-                resultContainer.textContent = response.reason;
+                resultContainer.textContent = query.response.reason;
+                submitBtn.removeAttribute('disabled');
                 break;
+            case 'progress':
+                setTimeout(_sendRequest, query.response.timeout, query.url, _responseResult);
         }
-        submitBtn.removeAttribute('disabled');
     }
 
-    function checkPhoneDigitsSum(phoneString){
+    function _checkPhoneDigitsSum(phoneString){
         var sum = 0;
         var maxSumInc = 30; // Максимальная сумма включительно
         var phoneSymbols = phoneString.split('');
         console.log('checking sum of: ', phoneSymbols);
         for(var i = 0; i < phoneSymbols.length; i++){
-            var phoneSymbolAsNumber = parseInt(phoneSymbols[i], 10);
-            if(!isNaN(phoneSymbolAsNumber)){ // Если сифвол число, то прибавить к сумме, иначе пропустить
-                sum += phoneSymbolAsNumber;
+            var phoneSymbolAsNum = parseInt(phoneSymbols[i], 10);
+            if(!isNaN(phoneSymbolAsNum)){ // Если сифвол число, то прибавить к сумме, иначе пропустить
+                sum += phoneSymbolAsNum;
             }
         }
         console.log('sum = ', sum);
-        if(sum > maxSumInc){
-            return false;
-        } else{
-            return true;
-        }
+        return (sum <= maxSumInc);
     }
 
     return {
-        validate: function () {
-            console.log('validate');
-            var result = {
-                isValid: true,
-                errorFields: []
-            };
-            var reForm = { // Регулярки для проверки полей
-                fio: /^(([A-Za-zА-Яа-я]+)\ ){2}([A-Za-zА-Яа-я]+){1}$/,
-                email: /^([a-z0-9_.-]+)@((ya\.ru)|((yandex)\.(ru|ua|by|kz|com)))$/,
-                phone: /^\+7\([\d]{3}\)[\d]{3}\-[\d]{2}\-[\d]{2}$/
-            };
-
-            for (var i = 0; i < fields.length; i++) { // Проверка полей в массиве fields
-                var currentField = fields[i];
-                console.log(currentField);
-                if (!reForm[currentField.name].test(currentField.value)) {
-                    currentField.classList.add('error');
-                    result.isValid = false;
-                    result.errorFields.push(currentField.name);
-                } else {
-                    currentField.classList.remove('error');
-                }
-                if (currentField.name === 'phone' && result.errorFields.indexOf('phone') === -1) {
-                    console.log('phone numbers check', result.errorFields);
-                    if (!checkPhoneDigitsSum(currentField.value)) { // Если телефон, то проверка суммы цифр
-                        currentField.classList.add('error');
-                        result.isValid = false;
-                        result.errorFields.push(currentField.name);
-                    }
-                }
-            }
-
-            return result;
-        },
-        getData: function () {
-            var fieldsData = {};
-            for (var i = 0; i < fields.length; i++) {
-                var currentField = fields[i];
-                fieldsData[currentField.name] = currentField.value;
-            }
-            return fieldsData;
-        },
-        setData: function (data) {
-            var acceptedFieldNames = ['phone', 'fio', 'email']; // Массив допустимых полей
-
-            for (var k in data) { // Занесение данных по ключам полученного объекта
-                if (acceptedFieldNames.indexOf(k) !== -1) {
-                    form[k].value = data[k];
-                }
-            }
-        },
-        submit: function () {
-            console.log('submit');
-            var validationResult = this.validate();
-            console.log(validationResult);
-            if (validationResult.isValid) {
-                console.log('ready to send');
-                submitBtn.setAttribute('disabled', 'disabled');
-
-                getResponse(form.action, responseAction); // Ajax запрос
-            }
-        }
+        validate: validate,
+        getData: getData,
+        setData: setData,
+        submit: submit
     }
 })();
 
