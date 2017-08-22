@@ -22,6 +22,11 @@ var MyForm = (function(){
         _checkFields(result);
         _setClasses(result);
 
+        if(result.errorFields.length) {
+            result.isValid = false;
+            resultContainer.classList.remove('success');
+        }
+
         return result;
     }
 
@@ -87,10 +92,6 @@ var MyForm = (function(){
                 currentField.classList.remove('error');
             else
                 currentField.classList.add('error');
-
-            if(result.errorFields.length)
-                result.isValid = false;
-
         }
     }
 
@@ -115,16 +116,20 @@ var MyForm = (function(){
         switch(query.response.status){
             case 'success':
                 resultContainer.classList.remove('error');
+                resultContainer.classList.remove('progress');
                 resultContainer.classList.add('success');
                 resultContainer.textContent = 'Success';
                 submitBtn.removeAttribute('disabled');
                 break;
             case 'error':
+                resultContainer.classList.remove('success');
+                resultContainer.classList.remove('progress');
                 resultContainer.classList.add('error');
                 resultContainer.textContent = query.response.reason;
                 submitBtn.removeAttribute('disabled');
                 break;
             case 'progress':
+                resultContainer.classList.add('progress');
                 setTimeout(_sendRequest, query.response.timeout, query.url, _responseResult);
         }
     }
